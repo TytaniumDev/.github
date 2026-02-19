@@ -1,0 +1,61 @@
+name: Claude Code Review
+
+on:
+  workflow_call:
+    inputs:
+      allowed_bots:
+        description: 'Comma-separated list of bot names allowed to trigger reviews'
+        required: false
+        type: string
+        default: 'google-labs-jules[bot]'
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: true
+
+jobs:
+  claude-review:
+    if: |
+      (github.event_name == 'pull_request' && !github.event.pull_request.draft) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude'))
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: ${{ inputs.allowed_bots }}
+          prompt: |
+            Review the diff for PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+
+            Steps:
+            1. Run `gh pr diff ${{ github.event.pull_request.number }}` to get the changes.
+            2. Read any CLAUDE.md files in the repo root and in directories containing changed files.
+            3. Review the diff for bugs, security issues, incorrect logic, and CLAUDE.md violations.
+               - Only flag issues you are confident about. No nitpicks or style suggestions.
+               - Do not flag pre-existing issues unrelated to the diff.
+            4. If issues are found, post inline comments using `gh pr review ${{ github.event.pull_request.number }} --comment --body "..."` or individual `gh pr comment` calls.
+            5. If no issues are found, post a single comment:
+               `gh pr comment ${{ github.event.pull_request.number }} --body "## Code review\n\nNo issues found. Checked for bugs and CLAUDE.md compliance."`
+          settings: |
+            {
+              "permissions": {
+                "allow": [
+                  "Bash",
+                  "WebFetch"
+                ]
+              }
+            }
