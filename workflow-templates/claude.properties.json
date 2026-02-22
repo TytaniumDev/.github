@@ -1,0 +1,6 @@
+{
+  "name": "Claude Code",
+  "description": "Run Claude Code when @claude is mentioned in issues, PRs, or review comments. Requires CLAUDE_CODE_OAUTH_TOKEN secret.",
+  "iconName": "terminal-icon",
+  "categories": ["automation"]
+}

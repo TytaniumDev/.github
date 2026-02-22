@@ -1,0 +1,6 @@
+{
+  "name": "CI",
+  "description": "Standard CI pipeline — lint, build, and test via shared reusable workflows. Requires scripts/lint.sh, scripts/build.sh, and scripts/test.sh in the repo.",
+  "iconName": "check-circle-icon",
+  "categories": ["continuous-integration"]
+}

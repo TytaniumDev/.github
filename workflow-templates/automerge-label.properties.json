@@ -1,0 +1,6 @@
+{
+  "name": "Auto Label PRs",
+  "description": "Automatically add an 'automerge' label to pull requests when opened, reopened, or synchronized.",
+  "iconName": "tag-icon",
+  "categories": ["automation"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Claude Code Review",
+  "description": "Automated PR code review using Claude Code. Requires CLAUDE_CODE_OAUTH_TOKEN secret.",
+  "iconName": "code-review-icon",
+  "categories": ["code-review"]
+}

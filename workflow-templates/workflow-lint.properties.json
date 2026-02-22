@@ -1,0 +1,6 @@
+{
+  "name": "Workflow Lint",
+  "description": "Check workflow files for unsafe inlining of multi-line secrets in run scripts.",
+  "iconName": "shield-check-icon",
+  "categories": ["security"]
+}

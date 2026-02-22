@@ -42,9 +42,10 @@ branches:
         # Require branches to be up to date before merging (Checked)
         strict: true
         # Status checks that are required
-        contexts: 
-          - "lint"
-          - "test"
+        contexts:
+          - "CI / Lint"
+          - "CI / Build"
+          - "CI / Test"
 
       # Do not allow bypassing the above settings (Unchecked)
       enforce_admins: false
