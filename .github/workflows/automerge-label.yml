@@ -5,6 +5,9 @@ on:
 
 jobs:
   add-label:
+    if: >-
+      github.event.review.state == 'approved' &&
+      github.event.review.user.login == 'TytaniumDev'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -15,15 +18,12 @@ jobs:
         with:
           script: |
             const labelName = 'automerge';
-            const { owner, repo, number } = context.issue;
+            const { owner, repo } = context.repo;
+            const number = context.payload.pull_request.number;
 
             // Check if label exists, create if not
             try {
-              await github.rest.issues.getLabel({
-                owner,
-                repo,
-                name: labelName
-              });
+              await github.rest.issues.getLabel({ owner, repo, name: labelName });
               console.log(`Label "${labelName}" already exists.`);
             } catch (error) {
               if (error.status === 404) {
@@ -33,17 +33,15 @@ jobs:
                     owner,
                     repo,
                     name: labelName,
-                    color: '0E8A16', // Greenish
+                    color: '0E8A16',
                     description: 'Automatically merge this PR'
                   });
                   console.log(`Label "${labelName}" created successfully.`);
                 } catch (createError) {
-                  // If creation fails (e.g. race condition or permissions), log but try to proceed
                   console.log(`Failed to create label "${labelName}": ${createError.message}`);
                 }
               } else {
                 console.log(`Error checking label "${labelName}": ${error.message}`);
-                // Proceed anyway, maybe it exists but getLabel failed for some reason?
               }
             }
 
@@ -58,5 +56,5 @@ jobs:
               console.log(`Added label "${labelName}" to PR #${number}.`);
             } catch (error) {
               console.log(`Failed to add label to PR #${number}: ${error.message}`);
-              process.exit(1); // Fail the workflow if we can't add the label
+              process.exit(1);
             }
