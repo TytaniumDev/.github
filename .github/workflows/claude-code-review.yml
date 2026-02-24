@@ -15,7 +15,7 @@ on:
 jobs:
   claude-review:
     if: |
-      (github.event_name == 'pull_request' && !github.event.pull_request.draft) ||
+      (github.event_name == 'pull_request' && \!github.event.pull_request.draft) ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude'))
 
@@ -39,7 +39,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: ${{ inputs.allowed_bots }}
           prompt: |
-            Review the diff for PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+            You are a code reviewer for PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
 
             Steps:
             1. Run `gh pr diff ${{ github.event.pull_request.number }}` to get the changes.
@@ -47,9 +47,20 @@ jobs:
             3. Review the diff for bugs, security issues, incorrect logic, and CLAUDE.md violations.
                - Only flag issues you are confident about. No nitpicks or style suggestions.
                - Do not flag pre-existing issues unrelated to the diff.
-            4. If issues are found, post inline comments using `gh pr review ${{ github.event.pull_request.number }} --comment --body "..."` or individual `gh pr comment` calls.
-            5. If no issues are found, post a single comment:
-               `gh pr comment ${{ github.event.pull_request.number }} --body "## Code review\n\nNo issues found. Checked for bugs and CLAUDE.md compliance."`
+            4. Based on your review, submit a FORMAL review (not just comments):
+
+               If issues are found:
+               - Submit a REQUEST_CHANGES review summarizing all issues.
+               - Use: `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "## Code Review - Changes Requested\n\n<summary and details of issues with file paths and line references>"`
+
+               If NO issues are found:
+               - Submit an APPROVE review.
+               - Use: `gh pr review ${{ github.event.pull_request.number }} --approve --body "## Code Review - Approved\n\nNo issues found. Checked for bugs, security issues, and CLAUDE.md compliance."`
+
+            IMPORTANT:
+            - Always submit exactly ONE formal review using --approve or --request-changes.
+            - Never use --comment. Always use --approve or --request-changes.
+            - Do NOT post separate inline comments via `gh pr comment`. Put all feedback in the review body.
           settings: |
             {
               "permissions": {
