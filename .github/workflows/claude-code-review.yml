@@ -13,7 +13,39 @@ on:
         required: true
 
 jobs:
+  check-approval:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      should_review: ${{ steps.check.outputs.should_review }}
+    steps:
+      - name: Check if Claude already approved
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [[ "$EVENT_NAME" != "pull_request" || "$EVENT_ACTION" != "synchronize" ]]; then
+            echo "should_review=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Check if Claude has already approved this PR
+          approved=$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" --paginate \
+            --jq '[.[] | select(.user.login == "claude[bot]" and .state == "APPROVED")] | length')
+          if [[ "$approved" -gt 0 ]]; then
+            echo "Claude has already approved this PR, skipping review"
+            echo "should_review=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_review=true" >> "$GITHUB_OUTPUT"
+          fi
+
   claude-review:
+    needs: check-approval
+    if: needs.check-approval.outputs.should_review == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
