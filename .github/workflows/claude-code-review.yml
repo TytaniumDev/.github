@@ -12,6 +12,10 @@ on:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
 
+concurrency:
+  group: claude-code-review-${{ github.repository }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
 jobs:
   check-approval:
     runs-on: ubuntu-latest
@@ -59,6 +63,21 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Create review submission script
+        run: |
+          cat > /tmp/submit-review.sh << 'SCRIPT'
+          #!/bin/bash
+          # One-shot wrapper: only the first call actually submits a review.
+          # Subsequent calls are no-ops to prevent duplicate reviews.
+          if [ -f /tmp/.claude-review-submitted ]; then
+            echo "Review already submitted — ignoring duplicate call"
+            exit 0
+          fi
+          gh pr review "$@"
+          touch /tmp/.claude-review-submitted
+          SCRIPT
+          chmod +x /tmp/submit-review.sh
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -78,15 +97,16 @@ jobs:
 
                If issues are found:
                - Submit a REQUEST_CHANGES review summarizing all issues.
-               - Use: `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "## Code Review - Changes Requested\n\n<summary and details of issues with file paths and line references>"`
+               - Use: `/tmp/submit-review.sh ${{ github.event.pull_request.number }} --request-changes --body "## Code Review - Changes Requested\n\n<summary and details of issues with file paths and line references>"`
 
                If NO issues are found:
                - Submit an APPROVE review.
-               - Use: `gh pr review ${{ github.event.pull_request.number }} --approve --body "## Code Review - Approved\n\nNo issues found. Checked for bugs, security issues, and CLAUDE.md compliance."`
+               - Use: `/tmp/submit-review.sh ${{ github.event.pull_request.number }} --approve --body "## Code Review - Approved\n\nNo issues found. Checked for bugs, security issues, and CLAUDE.md compliance."`
 
             IMPORTANT:
             - Always submit exactly ONE formal review using --approve or --request-changes.
             - Never use --comment. Always use --approve or --request-changes.
+            - You MUST use `/tmp/submit-review.sh` instead of `gh pr review` to submit the review.
             - Do NOT post separate inline comments via `gh pr comment`. Put all feedback in the review body.
           settings: |
             {
