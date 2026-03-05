@@ -1,0 +1,13 @@
+# Probot Settings — applied to all TytaniumDev repos
+# https://probot.github.io/apps/settings/
+
+repository:
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false
+  delete_branch_on_merge: true
+  allow_auto_merge: true
+
+# Branch protection for repos that use CI
+# Note: applied per-repo via repo-level .github/settings.yml
+# This file sets org-wide defaults only
