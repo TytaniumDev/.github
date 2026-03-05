@@ -7,14 +7,14 @@ on:
         description: 'Comma-separated list of bot names allowed to trigger reviews'
         required: false
         type: string
-        default: 'google-labs-jules[bot]'
+        default: '*'
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
 
 concurrency:
   group: claude-code-review-${{ github.repository }}-${{ github.event.pull_request.number || github.event.issue.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   check-approval:
