@@ -1,0 +1,103 @@
+name: Auto Approve
+
+on:
+  workflow_call:
+    inputs:
+      owner:
+        description: "GitHub username whose PRs should be auto-approved"
+        required: true
+        type: string
+      required_checks:
+        description: "Comma-separated list of required check names"
+        required: false
+        type: string
+        default: "CI / Lint,CI / Build,CI / Test"
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      checks: read
+    steps:
+      - name: Wait for CI and approve
+        uses: actions/github-script@v7
+        env:
+          EXPECTED_OWNER: ${{ inputs.owner }}
+          REQUIRED_CHECKS: ${{ inputs.required_checks }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const expectedOwner = process.env.EXPECTED_OWNER;
+            const requiredChecks = process.env.REQUIRED_CHECKS.split(',').map(s => s.trim());
+
+            // Resolve PR number from event
+            let prNumber = context.payload.pull_request?.number;
+            if (!prNumber && context.payload.check_suite) {
+              const prs = context.payload.check_suite.pull_requests || [];
+              if (prs.length === 0) {
+                console.log('No PRs associated with this check suite.');
+                return;
+              }
+              prNumber = prs[0].number;
+            }
+            if (!prNumber) {
+              console.log('Could not determine PR number.');
+              return;
+            }
+
+            // Verify PR author
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+            if (pr.user.login !== expectedOwner) {
+              console.log(`PR author is ${pr.user.login}, not ${expectedOwner}. Skipping.`);
+              return;
+            }
+
+            // Check if already approved by this bot
+            const { data: reviews } = await github.rest.pulls.listReviews({ owner, repo, pull_number: prNumber });
+            const alreadyApproved = reviews.some(r =>
+              r.user.login === 'github-actions[bot]' && r.state === 'APPROVED'
+            );
+            if (alreadyApproved) {
+              console.log('Already approved. Skipping.');
+              return;
+            }
+
+            // Poll for required checks (up to 10 minutes)
+            const maxAttempts = 40;
+            const delayMs = 15000;
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              const { data: checkRuns } = await github.rest.checks.listForRef({
+                owner, repo, ref: pr.head.sha, per_page: 100,
+              });
+
+              const results = requiredChecks.map(name => {
+                const run = checkRuns.check_runs.find(r => r.name === name);
+                return { name, status: run?.status, conclusion: run?.conclusion };
+              });
+
+              const allComplete = results.every(r => r.status === 'completed');
+              const allPassed = results.every(r => r.conclusion === 'success');
+
+              if (allComplete) {
+                if (allPassed) {
+                  console.log('All required checks passed. Approving PR.');
+                  await github.rest.pulls.createReview({
+                    owner, repo, pull_number: prNumber,
+                    event: 'APPROVE',
+                    body: 'All CI checks passed.',
+                  });
+                  return;
+                } else {
+                  console.log('Some checks failed:', results.filter(r => r.conclusion !== 'success'));
+                  return;
+                }
+              }
+
+              console.log(`Attempt ${attempt}/${maxAttempts}: waiting for checks...`, results);
+              await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+
+            console.log('Timed out waiting for checks.');
